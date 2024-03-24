@@ -78,6 +78,11 @@ const S8: [[u64; 16]; 4] = [
     [2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11],
 ];
 
+const P: [u8; 32] = [
+    16, 7, 20, 21, 29, 12, 28, 17, 1, 15, 23, 26, 5, 18, 31, 10, 2, 8, 24, 14, 32, 27, 3, 9, 19,
+    13, 30, 6, 22, 11, 4, 25,
+];
+
 fn apply<const N: usize>(original_no_bits: u8, table: [u8; N], data: u64) -> u64 {
     let mut new_data = 0_u64;
     for i in 0..table.len() {
@@ -116,16 +121,24 @@ fn create_keys(k: u64) -> [u64; 16] {
     keys
 }
 
-fn s(data: u64) {
+fn s(data: u64) -> u64 {
     eprintln!("{:048b}", data);
     let mut new_data = 0_u64;
-    let row1 = ((data & (1 << 47)) >> 46) | ((data & (1 << 42)) >> 42);
-    let col1 = ((data & (1 << 46)) >> 43)
-        | ((data & (1 << 45)) >> 43)
-        | ((data & (1 << 44)) >> 43)
-        | ((data & (1 << 43)) >> 43);
-    new_data |= S1[row1 as usize][col1 as usize] << 44;
-    eprintln!("{:048b}", new_data);
+    let mut j = 28;
+    let mut s_idx = 0;
+    let s_arr = [S1, S2, S3, S4, S5, S6, S7, S8];
+    for i in (5..=47).rev().step_by(6) {
+        let row = ((data & (1 << i)) >> (i - 1)) | ((data & (1 << (i - 5))) >> (i - 5));
+        let col = ((data & (1 << (i - 1))) >> (i - 4))
+            | ((data & (1 << (i - 2))) >> (i - 4))
+            | ((data & (1 << (i - 3))) >> (i - 4))
+            | ((data & (1 << (i - 4))) >> (i - 4));
+        new_data |= s_arr[s_idx][row as usize][col as usize] << j;
+        j -= 4;
+        s_idx += 1;
+    }
+
+    new_data
 }
 
 fn encrypt_block(keys: &[u64; 16], m: u64) {
@@ -136,9 +149,13 @@ fn encrypt_block(keys: &[u64; 16], m: u64) {
     eprintln!("L0: {:032b}, R0: {:032b}", l0, r0);
 
     let mut ln_rn = [(l0, r0); 17];
-    for i in 1..=1 {
+    for i in 1..=16 {
+        let s_result = s(keys[i - 1] ^ apply(32, E_BIT, ln_rn[i - 1].1));
+        let f_result = apply(32, P, s_result);
         let ln = ln_rn[i - 1].1;
-        s(keys[i - 1] ^ apply(32, E_BIT, ln_rn[i - 1].1));
+        let rn = ln_rn[i - 1].0 ^ f_result;
+        ln_rn[i] = (ln, rn);
+        eprintln!("L{}: {:032b}, R{}: {:032b}", i, ln, i, rn);
     }
 }
 
