@@ -1,0 +1,30 @@
+- Encryption, decryption tables
+  - bit index in the permuted block is the index in the table
+  - bit index in non-permuted block is the value of that index
+
+- Encryption
+  - Keys and subkeys
+    - Create initial 64-bit key (K)
+      - Random
+    - Apply PC_1 on K to get K+
+    - Split K+ into C0 (28 bits) and D0 (28 bits)
+    - Create Cn, Dn (1 <= n <= 16) from the standard schedule of left shifts
+    - Form kn (48 bits) by applying PC-2 on Cn.Dn (1 <= n <= 16)
+  - Block (M)
+    - Apply IP_1 on the block (M, 64 bits) to get permuted block IP
+    - Split IP into L0 (32 bits) and R0 (32 bits)
+    - Ln = Rn-1, Rn = Ln-1 + f(Rn-1, kn) (1 <= n <= 16)
+      - Where f(Rn-1, k) = P(S(k + E(Rn-1)))
+        - Where
+          - E(x) is the application of the E-bit selection table
+          - S(B1.B2.B3.B4.B5.B6.B7.B8) = S1(B1).S2(B2).S3(B3).S4(B4).S5(B5).S6(B6).S7(B7).S8(B8)
+            - Where Sn(Bn) is the number in the ith row and jth column of the Sn table
+                - Where
+                  - i is the number formed by concatenating the first and last bit of Bn
+                  - j is the number formed by concatenating the middle four bits of Bn
+          - P(x) is applying the P table on x
+    - Apply IP_inv on R16L16
+
+- Decryption
+  - Reverse the order of Kn
+  - Apply encryption
