@@ -169,12 +169,19 @@ fn encrypt_block(keys: &[u64; 16], m: u64) -> u64 {
     apply(64, IP_INV, (rp << 32) | lp)
 }
 
+fn decrypt_block(keys: &[u64; 16], c: u64) -> u64 {
+    let mut reversed = keys.clone();
+    reversed.reverse();
+    encrypt_block(&reversed, c)
+}
+
 fn main() {
+    let block = 0b0000000100100011010001010110011110001001101010111100110111101111;
+    let keys = &create_keys(0b0001001100110100010101110111100110011011101111001101111111110001);
+    let encrypted = encrypt_block(keys, block);
+    let decrypted = decrypt_block(keys, encrypted);
     eprintln!(
-        "{:064b}",
-        encrypt_block(
-            &create_keys(0b0001001100110100010101110111100110011011101111001101111111110001),
-            0b0000000100100011010001010110011110001001101010111100110111101111,
-        )
+        "Block: {:064b}\nEncrypted: {:064b}\nDecrypted: {:064b}",
+        block, encrypted, decrypted
     );
 }
