@@ -83,6 +83,12 @@ const P: [u8; 32] = [
     13, 30, 6, 22, 11, 4, 25,
 ];
 
+const IP_INV: [u8; 64] = [
+    40, 8, 48, 16, 56, 24, 64, 32, 39, 7, 47, 15, 55, 23, 63, 31, 38, 6, 46, 14, 54, 22, 62, 30,
+    37, 5, 45, 13, 53, 21, 61, 29, 36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11, 51, 19, 59, 27,
+    34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25,
+];
+
 fn apply<const N: usize>(original_no_bits: u8, table: [u8; N], data: u64) -> u64 {
     let mut new_data = 0_u64;
     for i in 0..table.len() {
@@ -141,27 +147,34 @@ fn s(data: u64) -> u64 {
     new_data
 }
 
-fn encrypt_block(keys: &[u64; 16], m: u64) {
+fn encrypt_block(keys: &[u64; 16], m: u64) -> u64 {
     let ip = apply(64, IP, m);
     eprintln!("IP: {:064b}", ip);
     let l0 = (ip & 0b1111111111111111111111111111111100000000000000000000000000000000) >> 32;
     let r0 = ip & 0b0000000000000000000000000000000011111111111111111111111111111111;
     eprintln!("L0: {:032b}, R0: {:032b}", l0, r0);
 
-    let mut ln_rn = [(l0, r0); 17];
+    let mut lp = l0;
+    let mut rp = r0;
     for i in 1..=16 {
-        let s_result = s(keys[i - 1] ^ apply(32, E_BIT, ln_rn[i - 1].1));
+        let s_result = s(keys[i - 1] ^ apply(32, E_BIT, rp));
         let f_result = apply(32, P, s_result);
-        let ln = ln_rn[i - 1].1;
-        let rn = ln_rn[i - 1].0 ^ f_result;
-        ln_rn[i] = (ln, rn);
+        let ln = rp;
+        let rn = lp ^ f_result;
+        lp = ln;
+        rp = rn;
         eprintln!("L{}: {:032b}, R{}: {:032b}", i, ln, i, rn);
     }
+
+    apply(64, IP_INV, (rp << 32) | lp)
 }
 
 fn main() {
-    encrypt_block(
-        &create_keys(0b0001001100110100010101110111100110011011101111001101111111110001),
-        0b0000000100100011010001010110011110001001101010111100110111101111,
+    eprintln!(
+        "{:064b}",
+        encrypt_block(
+            &create_keys(0b0001001100110100010101110111100110011011101111001101111111110001),
+            0b0000000100100011010001010110011110001001101010111100110111101111,
+        )
     );
 }
