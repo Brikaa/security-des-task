@@ -128,7 +128,6 @@ fn create_keys(k: u64) -> [u64; 16] {
 }
 
 fn s(data: u64) -> u64 {
-    eprintln!("{:048b}", data);
     let mut new_data = 0_u64;
     let mut j = 28;
     let mut s_idx = 0;
@@ -175,13 +174,88 @@ fn decrypt_block(keys: &[u64; 16], c: u64) -> u64 {
     encrypt_block(&reversed, c)
 }
 
+fn encrypt_message_bytes(padding: bool, keys: &[u64; 16], message_bytes: &[u8]) -> Vec<u8> {
+    let chunks = message_bytes.chunks_exact(8);
+    let mut remainder = chunks.remainder().to_vec();
+    let mut message_blocks: Vec<u64> = Vec::new();
+    for chunk in chunks {
+        let mut block = 0_u64;
+        for i in 1..=8 {
+            block |= (chunk[i - 1] as u64) << (64 - i * 8);
+        }
+        message_blocks.push(block);
+    }
+
+    if padding {
+        // PKCS#5 padding
+        let padding_len = 8 - (remainder.len() as u8);
+        for _ in 1..=padding_len {
+            remainder.push(padding_len);
+        }
+        assert_eq!(remainder.len(), 8);
+        let mut padding_block = 0_u64;
+        for i in 1..=8 {
+            padding_block |= (remainder[i - 1] as u64) << (64 - i * 8);
+        }
+        message_blocks.push(padding_block);
+    }
+
+    let mut encrypted_blocks: Vec<u64> = Vec::new();
+    for block in message_blocks {
+        encrypted_blocks.push(encrypt_block(keys, block));
+    }
+
+    let mut encrypted_bytes: Vec<u8> = Vec::new();
+    for block in encrypted_blocks {
+        let mut mask = 0b1111111100000000000000000000000000000000000000000000000000000000;
+        let mut mask_no = 1;
+        while mask != 0 {
+            encrypted_bytes.push(((block & mask) >> (64 - (mask_no * 8))).try_into().unwrap());
+            mask >>= 8;
+            mask_no += 1;
+        }
+    }
+
+    encrypted_bytes
+}
+
+fn encrypt_message(keys: &[u64; 16], message: &str) -> Vec<u8> {
+    encrypt_message_bytes(true, keys, message.as_bytes())
+}
+
+fn decrypt_bytes(keys: &[u64; 16], message_bytes: &[u8]) -> String {
+    let mut reversed = keys.clone();
+    reversed.reverse();
+    let mut decrypted = encrypt_message_bytes(false, &reversed, message_bytes);
+    let padding_len = *decrypted.last().unwrap();
+    for _ in 1..=padding_len {
+        decrypted.pop().unwrap();
+    }
+    String::from_utf8(decrypted).unwrap()
+}
+
 fn main() {
-    let block = 0b0000000100100011010001010110011110001001101010111100110111101111;
-    let keys = &create_keys(0b0001001100110100010101110111100110011011101111001101111111110001);
-    let encrypted = encrypt_block(keys, block);
-    let decrypted = decrypt_block(keys, encrypted);
-    eprintln!(
-        "Block: {:064b}\nEncrypted: {:064b}\nDecrypted: {:064b}",
-        block, encrypted, decrypted
-    );
+    {
+        let block = 0b0000000100100011010001010110011110001001101010111100110111101111;
+        let keys = &create_keys(0b0001001100110100010101110111100110011011101111001101111111110001);
+        let encrypted = encrypt_block(keys, block);
+        let decrypted = decrypt_block(keys, encrypted);
+        println!("Article example:");
+        println!(
+            "Block: {:064b}\nEncrypted: {:064b}\nDecrypted: {:064b}",
+            block, encrypted, decrypted
+        );
+    }
+
+    {
+        let message = "This is an encrypted message Σ🤔";
+        let keys = &create_keys(0b0001001100110100010101110111100110011011101111001101111111110001);
+        let encrypted = encrypt_message(keys, message);
+        let decrypted = decrypt_bytes(keys, encrypted.as_slice());
+        println!("\nCustom example:");
+        println!(
+            "Message: {}\nEncrypted bytes (bytes because not necessarily valid UTF-8): {:?}\nDecrypted message: {}",
+            message, encrypted, decrypted
+        );
+    }
 }
