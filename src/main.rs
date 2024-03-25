@@ -1,3 +1,5 @@
+use rand::Rng;
+
 const PC_1: [u8; 56] = [
     57, 49, 41, 33, 25, 17, 9, 1, 58, 50, 42, 34, 26, 18, 10, 2, 59, 51, 43, 35, 27, 19, 11, 3, 60,
     52, 44, 36, 63, 55, 47, 39, 31, 23, 15, 7, 62, 54, 46, 38, 30, 22, 14, 6, 61, 53, 45, 37, 29,
@@ -249,7 +251,7 @@ fn main() {
 
     {
         let message = "This is an encrypted message Σ🤔";
-        let keys = &create_keys(0b0001001100110100010101110111100110011011101111001101111111110001);
+        let keys = &create_keys(rand::thread_rng().gen());
         let encrypted = encrypt_message(keys, message);
         let decrypted = decrypt_bytes(keys, encrypted.as_slice());
         println!("\nCustom example:");
