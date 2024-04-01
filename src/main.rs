@@ -108,22 +108,16 @@ fn create_keys(k: u64) -> [u64; 16] {
     let k_plus = apply(64, PC_1, k);
     eprintln!("K+: {:056b}", k_plus);
 
-    let c0 = (k_plus & 0b0000000011111111111111111111111111110000000000000000000000000000) >> 28;
-    let d0 = k_plus & 0b0000000000000000000000000000000000001111111111111111111111111111;
-    eprintln!("C0: {:028b}, D0: {:028b}", c0, d0);
-
-    let mut cn_dn = [(c0, d0); 17];
-    for i in 1..=16 {
-        let cn = circular_shl(cn_dn[i - 1].0, SHIFT_SCHEDULE[i - 1]);
-        let dn = circular_shl(cn_dn[i - 1].1, SHIFT_SCHEDULE[i - 1]);
-        cn_dn[i] = (cn, dn);
-        eprintln!("C{}: {:028b}, D{}: {:028b}", i, cn, i, dn);
-    }
+    let cp = (k_plus & 0b0000000011111111111111111111111111110000000000000000000000000000) >> 28;
+    let dp = k_plus & 0b0000000000000000000000000000000000001111111111111111111111111111;
+    eprintln!("C0: {:028b}, D0: {:028b}", cp, dp);
 
     let mut keys = [0_u64; 16];
     for i in 1..=16 {
-        keys[i - 1] = apply(56, PC_2, (cn_dn[i].0 << 28) | cn_dn[i].1);
-        eprintln!("K{}: {:048b}", i, keys[i - 1]);
+        let cn = circular_shl(cp, SHIFT_SCHEDULE[i - 1]);
+        let dn = circular_shl(dp, SHIFT_SCHEDULE[i - 1]);
+        keys[i-1] = apply(56, PC_2, (cn << 28) | dn);
+        eprintln!("C{}: {:028b}, D{}: {:028b}", i, cn, i, dn);
     }
 
     keys
@@ -176,16 +170,21 @@ fn decrypt_block(keys: &[u64; 16], c: u64) -> u64 {
     encrypt_block(&reversed, c)
 }
 
+fn chunk_to_block(chunk: &[u8]) -> u64 {
+    let mut block = 0_u64;
+    for i in 1..=8 {
+        block |= (chunk[i - 1] as u64) << (64 - i * 8);
+    }
+
+    block
+}
+
 fn encrypt_message_bytes(padding: bool, keys: &[u64; 16], message_bytes: &[u8]) -> Vec<u8> {
     let chunks = message_bytes.chunks_exact(8);
     let mut remainder = chunks.remainder().to_vec();
     let mut message_blocks: Vec<u64> = Vec::new();
     for chunk in chunks {
-        let mut block = 0_u64;
-        for i in 1..=8 {
-            block |= (chunk[i - 1] as u64) << (64 - i * 8);
-        }
-        message_blocks.push(block);
+        message_blocks.push(chunk_to_block(chunk));
     }
 
     if padding {
@@ -195,11 +194,7 @@ fn encrypt_message_bytes(padding: bool, keys: &[u64; 16], message_bytes: &[u8]) 
             remainder.push(padding_len);
         }
         assert_eq!(remainder.len(), 8);
-        let mut padding_block = 0_u64;
-        for i in 1..=8 {
-            padding_block |= (remainder[i - 1] as u64) << (64 - i * 8);
-        }
-        message_blocks.push(padding_block);
+        message_blocks.push(chunk_to_block(&remainder));
     }
 
     let mut encrypted_blocks: Vec<u64> = Vec::new();
