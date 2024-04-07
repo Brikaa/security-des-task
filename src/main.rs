@@ -108,16 +108,16 @@ fn create_keys(k: u64) -> [u64; 16] {
     let k_plus = apply(64, PC_1, k);
     eprintln!("K+: {:056b}", k_plus);
 
-    let cp = (k_plus & 0b0000000011111111111111111111111111110000000000000000000000000000) >> 28;
-    let dp = k_plus & 0b0000000000000000000000000000000000001111111111111111111111111111;
+    let mut cp = (k_plus & 0b0000000011111111111111111111111111110000000000000000000000000000) >> 28;
+    let mut dp = k_plus & 0b0000000000000000000000000000000000001111111111111111111111111111;
     eprintln!("C0: {:028b}, D0: {:028b}", cp, dp);
 
     let mut keys = [0_u64; 16];
     for i in 1..=16 {
-        let cn = circular_shl(cp, SHIFT_SCHEDULE[i - 1]);
-        let dn = circular_shl(dp, SHIFT_SCHEDULE[i - 1]);
-        keys[i-1] = apply(56, PC_2, (cn << 28) | dn);
-        eprintln!("C{}: {:028b}, D{}: {:028b}", i, cn, i, dn);
+        cp = circular_shl(cp, SHIFT_SCHEDULE[i - 1]);
+        dp = circular_shl(dp, SHIFT_SCHEDULE[i - 1]);
+        keys[i-1] = apply(56, PC_2, (cp << 28) | dp);
+        eprintln!("C{}: {:028b}, D{}: {:028b}", i, cp, i, dp);
     }
 
     keys
